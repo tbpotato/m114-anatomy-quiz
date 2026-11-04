@@ -1,6 +1,6 @@
 # 第一次線跑｜分類題庫
 
-網頁：<https://tbpotato.github.io/anatomy-quiz/e_run1/>
+網頁：<https://tbpotato.github.io/m114-anatomy-quiz/e_run1/>
 
 ## 考試資訊
 
@@ -19,7 +19,7 @@
 ## 整理時間
 
 - 2026-10-03：建立網頁、依局部相鄰關係排序並發布（最後一次排序更新也是這天）
-- 2026-11-04：網站改名為 anatomy-quiz，本題庫移到 `e_run1/`
+- 2026-11-04：網站改名為 m114-anatomy-quiz，本題庫移到 `e_run1/`
 
 ## 整理方法
 
