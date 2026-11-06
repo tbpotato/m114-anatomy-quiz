@@ -84,7 +84,7 @@
 
   // ---- 每張卡片的「回報此題」 ----
   cards.forEach(c => {
-    c.insertAdjacentHTML('beforeend', '<button type="button" class="rp-card">回報這題答案有誤</button>');
+    c.insertAdjacentHTML('beforeend', '<button type="button" class="rp-card">我覺得這題答案有誤</button>');
     $('.rp-card', c).onclick = () => openDlg('答案有誤', parseInt(c.dataset.order, 10));
   });
 
@@ -184,7 +184,7 @@
       const open = list.filter(r => r.status !== '已修正' && r.status !== '不是錯誤').length;
       if (open) c.querySelector('h2').insertAdjacentHTML('beforeend', `<span class="rp-chip" title="${open} 則回報">⚠</span>`);
       const items = list.map(r =>
-        `<div class="rp-row"><span>${esc(r.suggest || r.desc)}, by ${esc(r.name || '匿名')}(${fmt(r.t)})</span>` +
+        `<div class="rp-row"><span>${esc(r.name || '匿名')}覺得答案是${esc(r.suggest || r.desc)}(${fmt(r.t)})</span>` +
         (r.id ? `<button type="button" class="rp-del" data-id="${esc(r.id)}">刪除</button>` : '') + '</div>').join('');
       const box = `<div class="rp-box">錯誤回報：${items}</div>`;
       (c.querySelector('details') || c).insertAdjacentHTML('beforeend', box);
