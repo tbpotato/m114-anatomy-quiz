@@ -17,6 +17,11 @@
                set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const $ = (s, r = document) => r.querySelector(s);
+  // 支持（upvote）：每個瀏覽器一個隨機 ID，後端用它記誰按過，才能正確收回
+  let uid = ls.get('rpUid');
+  if (!uid) { uid = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)); ls.set('rpUid', uid); }
+  let voteOn = ls.get('rpVoteOn') === '1';  // 後端支援投票（GET 回傳 vote: true）才顯示按鈕
+  const UP_SVG = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 10.5 7H7.6v3.5H4.4V7H1.5z"/></svg>';
 
   const css = `
   .rp-open{position:absolute;top:14px;right:28px;padding:0!important;border:0!important;background:none!important;font-size:14px!important;color:#526b64;text-decoration:underline;cursor:pointer}
@@ -45,7 +50,10 @@
   #rpDlg button{font:inherit;padding:8px 16px;border-radius:6px;border:1px solid #aaa;background:#fff;cursor:pointer}
   #rpDlg button[type=submit]{background:#183b35;color:#fff;border-color:#183b35}
   #rpDlg button:disabled{opacity:.5;cursor:wait}
-  #rpDlg .hp{position:absolute;left:-9999px}`;
+  #rpDlg .hp{position:absolute;left:-9999px}
+  .rp-up{margin-left:8px;padding:0 7px;border:1px solid #222;border-radius:999px;background:#fff;color:#111;font:600 12px/18px system-ui;display:inline-flex;align-items:center;gap:3px;cursor:pointer;vertical-align:1px}
+  .rp-up svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linejoin:round}
+  .rp-up.on{background:#111;color:#fff;border-color:#111}.rp-up.on svg{fill:currentColor}.rp-up:disabled{cursor:wait}`;
   document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`);
 
   const cards = [...document.querySelectorAll('article')];
@@ -176,15 +184,42 @@
       if (open) c.querySelector('h2').insertAdjacentHTML('beforeend', `<span class="rp-chip">⚠ ${open} 則回報</span>`);
       const items = list.map(r =>
         `<div>${esc(r.suggest || r.desc)}, by ${esc(r.name || '匿名')}(${fmt(r.t)})` +
+        (voteOn && r.id ? `<button type="button" class="rp-up${r.mine ? ' on' : ''}" data-id="${esc(r.id)}" aria-pressed="${!!r.mine}" title="${r.mine ? '收回支持' : '支持這個回報'}">${UP_SVG}<span>${r.votes || 0}</span></button>` : '') +
         (r.id ? `<button type="button" class="rp-del" data-id="${esc(r.id)}">刪除</button>` : '') + '</div>').join('');
       const box = `<div class="rp-box">錯誤回報：${items}</div>`;
       (c.querySelector('details') || c).insertAdjacentHTML('beforeend', box);
       c.querySelectorAll('.rp-del').forEach(b => b.onclick = () => delReport(b));
+      c.querySelectorAll('.rp-up').forEach(b => b.onclick = () => vote(b));
     });
     const n = cards.filter(c => c.dataset.rp).length;
     onlyBtn.hidden = !n;
     onlyBtn.textContent = '可能有錯的題目';
     recount();
+  }
+  const paintVote = (b, r) => {
+    b.classList.toggle('on', !!r.mine);
+    b.setAttribute('aria-pressed', !!r.mine);
+    b.title = r.mine ? '收回支持' : '支持這個回報';
+    $('span', b).textContent = r.votes || 0;
+  };
+  // 先在畫面上切換，後端回來再用它的數字；失敗就改回去。送出中按鈕停用，避免連點把數字弄亂
+  async function vote(b) {
+    const r = reports.find(x => x.id === b.dataset.id);
+    if (!r || b.disabled) return;
+    const up = !r.mine;
+    r.mine = up; r.votes = Math.max(0, (r.votes || 0) + (up ? 1 : -1));
+    paintVote(b, r); b.disabled = true;
+    try {
+      const res = await (await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'vote', id: r.id, uid, up }) })).json();
+      if (!res.ok) throw new Error(res.error || '失敗');
+      r.votes = res.votes; r.mine = res.voted;
+    } catch (err) {
+      r.mine = !up; r.votes = Math.max(0, r.votes + (up ? -1 : 1));
+      alert((up ? '支持' : '收回') + '失敗：' + err.message + '，請稍後再試');
+    } finally {
+      b.disabled = false; paintVote(b, r);
+      ls.set(cacheKey, JSON.stringify(reports));
+    }
   }
   async function delReport(b) {
     if (!confirm('確定要刪除這則回報嗎？刪除後所有人都看不到。')) return;
@@ -202,9 +237,11 @@
   }
   const cacheKey = 'rpCache:' + BANK;
   try { reports = JSON.parse(ls.get(cacheKey) || '[]'); render(); } catch (e) {}
-  fetch(API + '?bank=' + BANK).then(r => r.json()).then(d => {
+  fetch(API + '?bank=' + BANK + '&uid=' + encodeURIComponent(uid)).then(r => r.json()).then(d => {
     if (!d.ok) return;
     reports = d.reports;
+    voteOn = d.vote === true;
+    ls.set('rpVoteOn', voteOn ? '1' : '');
     ls.set(cacheKey, JSON.stringify(reports));
     render();
   }).catch(() => {});
