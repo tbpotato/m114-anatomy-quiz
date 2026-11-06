@@ -27,7 +27,7 @@
   .rp-open{position:absolute;top:14px;right:28px;padding:0!important;border:0!important;background:none!important;font-size:14px!important;color:#526b64;text-decoration:underline;cursor:pointer}
   @media(max-width:600px){header{position:relative!important}.rp-open{top:8px;right:16px}}
   .rp-only.on{background:#8a4b0f!important;color:#fff!important;border-color:#8a4b0f!important}
-  .rp-chip{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;background:#fdecc8;color:#8a4b0f;font-size:13px;font-weight:600;vertical-align:2px}
+  .rp-chip{margin-left:6px;color:inherit;font:inherit}
   .rp-card{margin-top:10px;font-size:13px;color:#526b64;background:none;border:0;padding:4px 0;cursor:pointer;text-decoration:underline}
   .rp-box{margin-top:12px;font-size:14px;line-height:1.6;color:#526b64}
   .rp-box b{color:#8a4b0f}.rp-item{margin-top:6px}.rp-item+.rp-item{border-top:1px dashed #ecd3b0;padding-top:6px}
@@ -182,7 +182,7 @@
       if (!list.length) { delete c.dataset.rp; return; }
       c.dataset.rp = list.length;
       const open = list.filter(r => r.status !== '已修正' && r.status !== '不是錯誤').length;
-      if (open) c.querySelector('h2').insertAdjacentHTML('beforeend', `<span class="rp-chip">⚠ ${open} 則回報</span>`);
+      if (open) c.querySelector('h2').insertAdjacentHTML('beforeend', `<span class="rp-chip" title="${open} 則回報">⚠</span>`);
       const items = list.map(r =>
         `<div class="rp-row"><span>${esc(r.suggest || r.desc)}, by ${esc(r.name || '匿名')}(${fmt(r.t)})</span>` +
         (r.id ? `<button type="button" class="rp-del" data-id="${esc(r.id)}">刪除</button>` : '') + '</div>').join('');
