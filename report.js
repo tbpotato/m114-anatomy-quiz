@@ -19,11 +19,12 @@
   const $ = (s, r = document) => r.querySelector(s);
 
   const css = `
-  .rp-open{background:#fff4e5!important;border-color:#d9822b!important;color:#8a4b0f!important}
+  .rp-open{position:absolute;top:14px;right:28px;padding:0!important;border:0!important;background:none!important;font-size:14px!important;color:#526b64;text-decoration:underline;cursor:pointer}
+  @media(max-width:600px){header{position:relative!important}.rp-open{top:8px;right:16px}}
   .rp-only.on{background:#8a4b0f!important;color:#fff!important;border-color:#8a4b0f!important}
   .rp-chip{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;background:#fdecc8;color:#8a4b0f;font-size:13px;font-weight:600;vertical-align:2px}
   .rp-card{margin-top:10px;font-size:13px;color:#526b64;background:none;border:0;padding:4px 0;cursor:pointer;text-decoration:underline}
-  .rp-box{margin-top:12px;border-left:3px solid #d9822b;background:#fff8ee;border-radius:6px;padding:8px 12px;font-size:14px;line-height:1.55}
+  .rp-box{margin-top:12px;font-size:14px;line-height:1.6;color:#526b64}
   .rp-box b{color:#8a4b0f}.rp-item{margin-top:6px}.rp-item+.rp-item{border-top:1px dashed #ecd3b0;padding-top:6px}
   .rp-meta{color:#7a8a85;font-size:12px}.rp-del{margin-left:8px;padding:0;border:0;background:none;color:#b3261e;font-size:12px;cursor:pointer;text-decoration:underline}.rp-del:disabled{color:#999;cursor:wait}.rp-sug{font-weight:600;color:#152a26}
   .rp-st{display:inline-block;padding:0 6px;border-radius:4px;font-size:12px;margin-right:4px}
@@ -54,13 +55,14 @@
   // ---- 上方按鈕 ----
   const nav = $('header nav');
   nav.insertAdjacentHTML('beforeend',
-    '<button type="button" class="rp-only" hidden>⚠ 只看有回報的題目</button><button type="button" class="rp-open">回報問題</button>');
+    '<button type="button" class="rp-only" hidden>可能有錯的題目</button>');
+  $('header').insertAdjacentHTML('beforeend', '<button type="button" class="rp-open">回報問題</button>');
   const onlyBtn = $('.rp-only', nav);
   let onlyOn = false;
   const recount = () => {
     if (!onlyOn) return;
     cards.forEach(c => { if (!c.dataset.rp) c.hidden = true; });
-    $('#count').textContent = '顯示 ' + cards.filter(c => !c.hidden).length + ' 題（只看有回報的）';
+    $('#count').textContent = '顯示 ' + cards.filter(c => !c.hidden).length + ' 題（可能有錯的題目）';
   };
   onlyBtn.onclick = () => {
     onlyOn = !onlyOn;
@@ -85,7 +87,7 @@
     <label class="f-type">問題類型<select name="type"><option value="" disabled>請選擇</option>${TYPES.map(t => `<option>${t}</option>`).join('')}</select></label>
     <label class="f-q">題號<input name="q" type="number" inputmode="numeric" min="1" max="${cards.length}"><span class="prev" hidden></span></label>
     <label class="f-sug">建議的正確答案<input name="suggest" maxlength="120" placeholder="送出後會公開顯示在該題的正解下方" autocapitalize="off" spellcheck="false"></label>
-    <label>問題說明<textarea name="desc" maxlength="600" required></textarea></label>
+    <label class="f-desc">問題說明<textarea name="desc" maxlength="600" required></textarea></label>
     <input class="hp" name="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
     <div class="row"><span class="msg"></span><button type="button" value="cancel">取消</button><button type="submit">送出</button></div>
   </form></dialog>`);
@@ -95,6 +97,7 @@
     const isAns = f.type.value === '答案有誤';
     $('.f-q', dlg).hidden = !isAns;
     $('.f-sug', dlg).hidden = !isAns;
+    $('.f-desc', dlg).hidden = isAns;
     showPrev();
   };
   const showPrev = () => {
@@ -120,17 +123,18 @@
     setMsg('');
     sync();
     dlg.showModal();
-    (q ? f.desc : (f.name.value ? f.type : f.name)).focus();
+    (q ? f.suggest : (f.name.value ? f.type : f.name)).focus();
   }
-  $('.rp-open', nav).onclick = () => openDlg();
+  $('.rp-open').onclick = () => openDlg();
 
   form.onsubmit = async e => {
     e.preventDefault();
     const type = f.type.value, n = parseInt(f.q.value, 10), c = byNo.get(n);
     if (!type) { setMsg('請選擇問題類型', 'err'); f.type.focus(); return; }
     if (type === '答案有誤' && !c) { setMsg('請填正確的題號', 'err'); f.q.focus(); return; }
-    if (f.desc.value.trim().length < 2) { setMsg('請寫問題說明', 'err'); f.desc.focus(); return; }
-    const p = { bank: BANK, type, name: f.name.value.trim(), desc: f.desc.value.trim(), hp: f.hp.value,
+    if (type === '答案有誤' && !f.suggest.value.trim()) { setMsg('請填建議的正確答案', 'err'); f.suggest.focus(); return; }
+    if (type !== '答案有誤' && f.desc.value.trim().length < 2) { setMsg('請寫問題說明', 'err'); f.desc.focus(); return; }
+    const p = { bank: BANK, type, name: f.name.value.trim(), desc: type === '答案有誤' ? '' : f.desc.value.trim(), hp: f.hp.value,
                 q: type === '答案有誤' ? String(n) : '', key: type === '答案有誤' ? c.dataset.original : '',
                 suggest: type === '答案有誤' ? f.suggest.value.trim() : '', page: location.href.slice(0, 200) };
     ls.set('rpName', p.name);
@@ -170,20 +174,16 @@
       c.dataset.rp = list.length;
       const open = list.filter(r => r.status !== '已修正' && r.status !== '不是錯誤').length;
       if (open) c.querySelector('h2').insertAdjacentHTML('beforeend', `<span class="rp-chip">⚠ ${open} 則回報</span>`);
-      const items = list.map(r => {
-        const [st, cls] = STATUS[r.status] || [r.status, 'pend'];
-        return `<div class="rp-item"><span class="rp-st ${cls}">${esc(st)}</span>` +
-          (r.suggest ? `建議答案：<span class="rp-sug">${esc(r.suggest)}</span>　` : '') +
-          `${esc(r.desc)}<div class="rp-meta">${esc(r.name || '匿名')} · ${fmt(r.t)}` +
-          (r.id ? `<button type="button" class="rp-del" data-id="${esc(r.id)}">刪除</button>` : '') + '</div></div>';
-      }).join('');
-      const box = `<div class="rp-box"><b>同學回報（${list.length}）</b>${items}</div>`;
+      const items = list.map(r =>
+        `<div>${esc(r.suggest || r.desc)}, by ${esc(r.name || '匿名')}(${fmt(r.t)})` +
+        (r.id ? `<button type="button" class="rp-del" data-id="${esc(r.id)}">刪除</button>` : '') + '</div>').join('');
+      const box = `<div class="rp-box">錯誤回報：${items}</div>`;
       (c.querySelector('details') || c).insertAdjacentHTML('beforeend', box);
       c.querySelectorAll('.rp-del').forEach(b => b.onclick = () => delReport(b));
     });
     const n = cards.filter(c => c.dataset.rp).length;
     onlyBtn.hidden = !n;
-    onlyBtn.textContent = `⚠ 只看有回報的題目（${n}）`;
+    onlyBtn.textContent = '可能有錯的題目';
     recount();
   }
   async function delReport(b) {
