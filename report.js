@@ -80,11 +80,11 @@
   // ---- 彈窗 ----
   document.body.insertAdjacentHTML('beforeend', `
   <dialog id="rpDlg"><form method="dialog" novalidate>
-    <h3>回報問題</h3><p class="sub">送出後會公開顯示在該題的正解下方</p>
+    <h3>回報問題</h3>
     <label>暱稱 <small>選填，會顯示在回報上；不填就顯示「匿名」</small><input name="name" maxlength="20" autocomplete="nickname"></label>
-    <label>問題類型<select name="type">${TYPES.map(t => `<option>${t}</option>`).join('')}</select></label>
-    <label class="f-q">題號 <small>卡片左上角的數字</small><input name="q" type="number" inputmode="numeric" min="1" max="${cards.length}"><span class="prev" hidden></span></label>
-    <label class="f-sug">建議的正確答案 <small>選填</small><input name="suggest" maxlength="120" autocapitalize="off" spellcheck="false"></label>
+    <label class="f-type">問題類型<select name="type"><option value="" disabled>請選擇</option>${TYPES.map(t => `<option>${t}</option>`).join('')}</select></label>
+    <label class="f-q">題號<input name="q" type="number" inputmode="numeric" min="1" max="${cards.length}"><span class="prev" hidden></span></label>
+    <label class="f-sug">建議的正確答案<input name="suggest" maxlength="120" placeholder="送出後會公開顯示在該題的正解下方" autocapitalize="off" spellcheck="false"></label>
     <label>問題說明<textarea name="desc" maxlength="600" required></textarea></label>
     <input class="hp" name="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
     <div class="row"><span class="msg"></span><button type="button" value="cancel">取消</button><button type="submit">送出</button></div>
@@ -109,11 +109,14 @@
   f.type.onchange = sync;
   f.q.oninput = showPrev;
   $('button[value=cancel]', dlg).onclick = () => dlg.close();
-  function openDlg(type = '答案有誤', q = '') {
+  // 從卡片開：固定「答案有誤」、帶入題號、不顯示類型選單；從上方開：類型不預設
+  function openDlg(type = '', q = '') {
     form.reset();
     f.name.value = ls.get('rpName') || '';
     f.type.value = type;
     f.q.value = q || '';
+    $('.f-type', dlg).hidden = !!q;
+    $('h3', dlg).textContent = q ? `回報第 ${q} 題答案有誤` : '回報問題';
     setMsg('');
     sync();
     dlg.showModal();
@@ -124,6 +127,7 @@
   form.onsubmit = async e => {
     e.preventDefault();
     const type = f.type.value, n = parseInt(f.q.value, 10), c = byNo.get(n);
+    if (!type) { setMsg('請選擇問題類型', 'err'); f.type.focus(); return; }
     if (type === '答案有誤' && !c) { setMsg('請填正確的題號', 'err'); f.q.focus(); return; }
     if (f.desc.value.trim().length < 2) { setMsg('請寫問題說明', 'err'); f.desc.focus(); return; }
     const p = { bank: BANK, type, name: f.name.value.trim(), desc: f.desc.value.trim(), hp: f.hp.value,
