@@ -246,3 +246,100 @@
     render();
   }).catch(() => {});
 })();
+
+/* 圖片放大檢視：點題目圖片 → 接近全螢幕顯示。
+   右上角 ✕、Esc、點黑色背景、手機往下滑、手機「返回」都能關；← → 鍵／左右滑／兩側箭頭切換上一題、下一題（只在目前篩選看得到的題目間切換）；
+   點圖片切換「放大到原尺寸」，可拖曳捲動看細節。 */
+(() => {
+  if (!document.querySelector('article img')) return;
+  document.head.insertAdjacentHTML('beforeend', `<style>
+  article img{cursor:zoom-in}
+  #lb{position:fixed;inset:0;z-index:9999;background:rgba(10,14,13,.97);display:none;touch-action:none;user-select:none}
+  #lb.on{display:block}
+  #lb .lb-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:56px 64px 48px;box-sizing:border-box;overflow:hidden}
+  #lb .lb-stage img{max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in;border-radius:4px;background:#fff;transition:opacity .15s}
+  #lb.zoom .lb-stage{display:block;overflow:auto;padding:0;touch-action:pan-x pan-y}
+  #lb.zoom .lb-stage img{max-width:none;max-height:none;cursor:zoom-out;border-radius:0}
+  #lb button{position:absolute;border:0;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font:400 26px/1 system-ui;border-radius:999px}
+  #lb button:hover{background:rgba(255,255,255,.25)}
+  #lb .lb-x{top:10px;right:12px;width:44px;height:44px;z-index:2}
+  #lb .lb-p,#lb .lb-n{top:50%;width:44px;height:64px;margin-top:-32px;border-radius:10px;font-size:30px}
+  #lb .lb-p{left:10px}#lb .lb-n{right:10px}
+  #lb .lb-cap{position:absolute;left:0;right:0;bottom:0;padding:12px 16px;color:#e8efed;font:14px/1.4 system-ui;text-align:center;pointer-events:none}
+  #lb .lb-top{position:absolute;left:16px;top:20px;color:#b9c7c3;font:13px system-ui;pointer-events:none}
+  #lb.zoom .lb-p,#lb.zoom .lb-n,#lb.zoom .lb-cap{display:none}
+  @media(max-width:600px){#lb .lb-stage{padding:56px 8px 52px}#lb .lb-p,#lb .lb-n{display:none}}
+  </style>`);
+  document.body.insertAdjacentHTML('beforeend', `<div id="lb" role="dialog" aria-modal="true" aria-label="圖片放大">
+    <div class="lb-stage"><img alt=""></div>
+    <span class="lb-top"></span>
+    <button type="button" class="lb-p" aria-label="上一題">‹</button>
+    <button type="button" class="lb-n" aria-label="下一題">›</button>
+    <button type="button" class="lb-x" aria-label="關閉">✕</button>
+    <div class="lb-cap"></div></div>`);
+  const lb = document.getElementById('lb'), stage = lb.querySelector('.lb-stage'), big = stage.querySelector('img');
+  let list = [], i = 0, open = false;
+  const visible = () => [...document.querySelectorAll('article')].filter(a => !a.hidden && a.offsetParent !== null && a.querySelector('img'));
+  const show = n => {
+    i = (n + list.length) % list.length;
+    const a = list[i], im = a.querySelector('img');
+    lb.classList.remove('zoom');
+    big.src = im.currentSrc || im.src;
+    big.alt = im.alt;
+    const h = a.querySelector('h2'), reg = a.querySelector('.region');
+    lb.querySelector('.lb-cap').textContent = [h && h.firstChild.textContent.trim(), reg && reg.textContent].filter(Boolean).join('　');
+    lb.querySelector('.lb-top').textContent = list.length > 1 ? `${i + 1} / ${list.length}` : '';
+    [i - 1, i + 1].forEach(k => { const x = list[(k + list.length) % list.length]; if (x) new Image().src = x.querySelector('img').src; });
+  };
+  const openAt = art => {
+    list = visible(); if (!list.includes(art)) list = [art];
+    show(list.indexOf(art));
+    lb.classList.add('on'); document.documentElement.style.overflow = 'hidden'; open = true;
+    history.pushState({ lb: 1 }, '');
+  };
+  const doClose = () => {
+    if (!open) return; open = false;
+    lb.classList.remove('on', 'zoom'); document.documentElement.style.overflow = '';
+    list[i] && list[i].scrollIntoView({ block: 'nearest' });
+  };
+  const close = () => { if (history.state && history.state.lb) history.back(); else doClose(); };
+  addEventListener('popstate', doClose);
+  document.addEventListener('click', e => {
+    const im = e.target.closest('article img');
+    if (im && !lb.contains(im)) openAt(im.closest('article'));
+  });
+  lb.querySelector('.lb-x').onclick = close;
+  lb.querySelector('.lb-p').onclick = () => show(i - 1);
+  lb.querySelector('.lb-n').onclick = () => show(i + 1);
+  stage.addEventListener('click', e => {
+    if (e.target !== big) { if (!lb.classList.contains('zoom')) close(); return; }
+    if (moved) return;
+    // 切換原尺寸；放大時捲到點擊的位置
+    const r = big.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+    if (big.naturalWidth <= r.width * 1.05 && !lb.classList.contains('zoom')) {
+      big.style.width = r.width * 2 + 'px';
+    } else big.style.width = '';
+    const z = lb.classList.toggle('zoom');
+    if (!z) big.style.width = '';
+    else requestAnimationFrame(() => { stage.scrollLeft = fx * big.offsetWidth - stage.clientWidth / 2; stage.scrollTop = fy * big.offsetHeight - stage.clientHeight / 2; });
+  });
+  // 放大時用滑鼠拖曳捲動
+  let drag = null, moved = false;
+  stage.addEventListener('mousedown', e => { if (lb.classList.contains('zoom')) { drag = [e.clientX, e.clientY, stage.scrollLeft, stage.scrollTop]; moved = false; e.preventDefault(); } });
+  addEventListener('mousemove', e => { if (!drag) return; const dx = e.clientX - drag[0], dy = e.clientY - drag[1]; if (Math.abs(dx) + Math.abs(dy) > 4) moved = true; stage.scrollLeft = drag[2] - dx; stage.scrollTop = drag[3] - dy; });
+  addEventListener('mouseup', () => { drag = null; setTimeout(() => { moved = false; }); });
+  // 手機：左右滑換題、往下滑關閉（放大狀態下讓它正常捲動）
+  let t0 = null;
+  lb.addEventListener('touchstart', e => { if (!lb.classList.contains('zoom') && e.touches.length === 1) t0 = [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
+  lb.addEventListener('touchend', e => {
+    if (!t0) return; const t = e.changedTouches[0], dx = t.clientX - t0[0], dy = t.clientY - t0[1]; t0 = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) { show(i + (dx < 0 ? 1 : -1)); moved = true; setTimeout(() => { moved = false; }, 350); }
+    else if (dy > 80 && dy > Math.abs(dx)) { close(); }
+  });
+  addEventListener('keydown', e => {
+    if (!open) return;
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if (e.key === 'ArrowLeft') show(i - 1);
+    else if (e.key === 'ArrowRight') show(i + 1);
+  });
+})();
