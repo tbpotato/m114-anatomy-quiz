@@ -81,7 +81,7 @@
   document.body.insertAdjacentHTML('beforeend', `
   <dialog id="rpDlg"><form method="dialog" novalidate>
     <h3>回報問題</h3>
-    <label>暱稱 <small>選填，會顯示在回報上；不填就顯示「匿名」</small><input name="name" maxlength="20" autocomplete="nickname"></label>
+    <label>暱稱<input name="name" maxlength="20" autocomplete="nickname"></label>
     <label class="f-type">問題類型<select name="type"><option value="" disabled>請選擇</option>${TYPES.map(t => `<option>${t}</option>`).join('')}</select></label>
     <label class="f-q">題號<input name="q" type="number" inputmode="numeric" min="1" max="${cards.length}"><span class="prev" hidden></span></label>
     <label class="f-sug">建議的正確答案<input name="suggest" maxlength="120" placeholder="送出後會公開顯示在該題的正解下方" autocapitalize="off" spellcheck="false"></label>
