@@ -248,30 +248,30 @@
 })();
 
 /* 圖片放大檢視：點題目圖片 → 接近全螢幕顯示。
-   右上角 ✕、Esc、點黑色背景、手機往下滑、手機「返回」都能關；← → 鍵／左右滑／兩側箭頭切換上一題、下一題（只在目前篩選看得到的題目間切換）；
-   點圖片切換「放大到原尺寸」，可拖曳捲動看細節。 */
+   關閉：右上角 ✕、Esc、點黑色背景、手機往下滑、手機「返回」。
+   換題：← → 鍵／左右滑／兩側箭頭（只在目前篩選看得到的題目間切換）。
+   縮放：手機雙指縮放、點兩下放大／還原，放大後單指拖曳；電腦點圖片放大／還原、滾輪縮放、拖曳移動。 */
 (() => {
   if (!document.querySelector('article img')) return;
   document.head.insertAdjacentHTML('beforeend', `<style>
   article img{cursor:zoom-in}
-  #lb{position:fixed;inset:0;z-index:9999;background:rgba(10,14,13,.97);display:none;touch-action:none;user-select:none}
+  #lb{position:fixed;inset:0;z-index:9999;background:rgba(10,14,13,.97);display:none;touch-action:none;user-select:none;-webkit-user-select:none;overscroll-behavior:contain}
   #lb.on{display:block}
   #lb .lb-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:56px 64px 48px;box-sizing:border-box;overflow:hidden}
-  #lb .lb-stage img{max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in;border-radius:4px;background:#fff;transition:opacity .15s}
-  #lb.zoom .lb-stage{display:block;overflow:auto;padding:0;touch-action:pan-x pan-y}
-  #lb.zoom .lb-stage img{max-width:none;max-height:none;cursor:zoom-out;border-radius:0}
-  #lb button{position:absolute;border:0;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font:400 26px/1 system-ui;border-radius:999px}
+  #lb .lb-stage img{max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in;border-radius:4px;background:#fff;transform-origin:50% 50%;will-change:transform;-webkit-user-drag:none}
+  #lb.zoom .lb-stage img{cursor:grab;border-radius:0}
+  #lb button{position:absolute;border:0;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font:400 26px/1 system-ui;border-radius:999px;z-index:2}
   #lb button:hover{background:rgba(255,255,255,.25)}
-  #lb .lb-x{top:10px;right:12px;width:44px;height:44px;z-index:2}
+  #lb .lb-x{top:10px;right:12px;width:44px;height:44px}
   #lb .lb-p,#lb .lb-n{top:50%;width:44px;height:64px;margin-top:-32px;border-radius:10px;font-size:30px}
   #lb .lb-p{left:10px}#lb .lb-n{right:10px}
   #lb .lb-cap{position:absolute;left:0;right:0;bottom:0;padding:12px 16px;color:#e8efed;font:14px/1.4 system-ui;text-align:center;pointer-events:none}
   #lb .lb-top{position:absolute;left:16px;top:20px;color:#b9c7c3;font:13px system-ui;pointer-events:none}
-  #lb.zoom .lb-p,#lb.zoom .lb-n,#lb.zoom .lb-cap{display:none}
+  #lb.zoom .lb-p,#lb.zoom .lb-n,#lb.zoom .lb-cap,#lb.zoom .lb-top{display:none}
   @media(max-width:600px){#lb .lb-stage{padding:56px 8px 52px}#lb .lb-p,#lb .lb-n{display:none}}
   </style>`);
   document.body.insertAdjacentHTML('beforeend', `<div id="lb" role="dialog" aria-modal="true" aria-label="圖片放大">
-    <div class="lb-stage"><img alt=""></div>
+    <div class="lb-stage"><img alt="" draggable="false"></div>
     <span class="lb-top"></span>
     <button type="button" class="lb-p" aria-label="上一題">‹</button>
     <button type="button" class="lb-n" aria-label="下一題">›</button>
@@ -279,17 +279,47 @@
     <div class="lb-cap"></div></div>`);
   const lb = document.getElementById('lb'), stage = lb.querySelector('.lb-stage'), big = stage.querySelector('img');
   let list = [], i = 0, open = false;
+
+  // ---- 縮放狀態：translate(x,y) scale(s)，以圖片中心為原點 ----
+  let s = 1, x = 0, y = 0;
+  const MAX = 6;
+  const center = () => [big.offsetLeft + big.offsetWidth / 2, big.offsetTop + big.offsetHeight / 2];
+  const clamp = () => {
+    if (s <= 1) { x = 0; y = 0; return; }
+    const [cx, cy] = center(), W = stage.clientWidth, H = stage.clientHeight;
+    const bx = Math.max(0, (big.offsetWidth * s - W) / 2), by = Math.max(0, (big.offsetHeight * s - H) / 2);
+    const ox = W / 2 - cx, oy = H / 2 - cy;   // 放大後以畫面中心為準
+    x = Math.min(ox + bx, Math.max(ox - bx, x));
+    y = Math.min(oy + by, Math.max(oy - by, y));
+  };
+  const apply = anim => {
+    big.style.transition = anim ? 'transform .22s ease' : 'none';
+    big.style.transform = `translate(${x}px,${y}px) scale(${s})`;
+    lb.classList.toggle('zoom', s > 1.01);
+  };
+  // 以畫面上的點 (px,py) 為中心縮放到 ns
+  const zoomAt = (ns, px, py, anim) => {
+    ns = Math.min(MAX, Math.max(1, ns));
+    const [cx, cy] = center();
+    x = px - cx - (px - cx - x) * ns / s;
+    y = py - cy - (py - cy - y) * ns / s;
+    s = ns; clamp(); apply(anim);
+  };
+  const reset = anim => { s = 1; x = 0; y = 0; apply(anim); };
+  const zoomStep = () => Math.min(MAX, Math.max(2.5, big.naturalWidth / big.offsetWidth));
+  const toggleAt = (px, py) => s > 1.01 ? reset(true) : zoomAt(zoomStep(), px, py, true);
+
   const visible = () => [...document.querySelectorAll('article')].filter(a => !a.hidden && a.offsetParent !== null && a.querySelector('img'));
   const show = n => {
     i = (n + list.length) % list.length;
     const a = list[i], im = a.querySelector('img');
-    lb.classList.remove('zoom');
+    reset(false);
     big.src = im.currentSrc || im.src;
     big.alt = im.alt;
     const h = a.querySelector('h2'), reg = a.querySelector('.region');
     lb.querySelector('.lb-cap').textContent = [h && h.firstChild.textContent.trim(), reg && reg.textContent].filter(Boolean).join('　');
     lb.querySelector('.lb-top').textContent = list.length > 1 ? `${i + 1} / ${list.length}` : '';
-    [i - 1, i + 1].forEach(k => { const x = list[(k + list.length) % list.length]; if (x) new Image().src = x.querySelector('img').src; });
+    [i - 1, i + 1].forEach(k => { const z = list[(k + list.length) % list.length]; if (z) new Image().src = z.querySelector('img').src; });
   };
   const openAt = art => {
     list = visible(); if (!list.includes(art)) list = [art];
@@ -299,7 +329,7 @@
   };
   const doClose = () => {
     if (!open) return; open = false;
-    lb.classList.remove('on', 'zoom'); document.documentElement.style.overflow = '';
+    lb.classList.remove('on', 'zoom'); lb.style.opacity = ''; document.documentElement.style.overflow = '';
     list[i] && list[i].scrollIntoView({ block: 'nearest' });
   };
   const close = () => { if (history.state && history.state.lb) history.back(); else doClose(); };
@@ -311,35 +341,88 @@
   lb.querySelector('.lb-x').onclick = close;
   lb.querySelector('.lb-p').onclick = () => show(i - 1);
   lb.querySelector('.lb-n').onclick = () => show(i + 1);
+  addEventListener('resize', () => { if (open) { clamp(); apply(false); } });
+
+  // ---- 滑鼠（電腦）；手機的點擊由下面的觸控處理 ----
+  let lastTouch = 0, moved = false;
   stage.addEventListener('click', e => {
-    if (e.target !== big) { if (!lb.classList.contains('zoom')) close(); return; }
-    if (moved) return;
-    // 切換原尺寸；放大時捲到點擊的位置
-    const r = big.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
-    if (big.naturalWidth <= r.width * 1.05 && !lb.classList.contains('zoom')) {
-      big.style.width = r.width * 2 + 'px';
-    } else big.style.width = '';
-    const z = lb.classList.toggle('zoom');
-    if (!z) big.style.width = '';
-    else requestAnimationFrame(() => { stage.scrollLeft = fx * big.offsetWidth - stage.clientWidth / 2; stage.scrollTop = fy * big.offsetHeight - stage.clientHeight / 2; });
+    if (Date.now() - lastTouch < 700 || moved) return;
+    if (e.target === big) toggleAt(e.clientX, e.clientY);
+    else if (s <= 1.01) close();
+    else reset(true);
   });
-  // 放大時用滑鼠拖曳捲動
-  let drag = null, moved = false;
-  stage.addEventListener('mousedown', e => { if (lb.classList.contains('zoom')) { drag = [e.clientX, e.clientY, stage.scrollLeft, stage.scrollTop]; moved = false; e.preventDefault(); } });
-  addEventListener('mousemove', e => { if (!drag) return; const dx = e.clientX - drag[0], dy = e.clientY - drag[1]; if (Math.abs(dx) + Math.abs(dy) > 4) moved = true; stage.scrollLeft = drag[2] - dx; stage.scrollTop = drag[3] - dy; });
+  stage.addEventListener('wheel', e => { e.preventDefault(); zoomAt(s * Math.exp(-e.deltaY / 300), e.clientX, e.clientY, false); }, { passive: false });
+  let drag = null;
+  stage.addEventListener('mousedown', e => { if (s > 1.01 && e.button === 0) { drag = [e.clientX, e.clientY, x, y]; moved = false; e.preventDefault(); } });
+  addEventListener('mousemove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag[0], dy = e.clientY - drag[1];
+    if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+    x = drag[2] + dx; y = drag[3] + dy; clamp(); apply(false);
+  });
   addEventListener('mouseup', () => { drag = null; setTimeout(() => { moved = false; }); });
-  // 手機：左右滑換題、往下滑關閉（放大狀態下讓它正常捲動）
-  let t0 = null;
-  lb.addEventListener('touchstart', e => { if (!lb.classList.contains('zoom') && e.touches.length === 1) t0 = [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
+
+  // ---- 觸控：雙指縮放、放大後單指拖曳、左右滑換題、往下滑關閉、點兩下放大／還原 ----
+  let g = null, lastTap = 0, lastTapXY = [0, 0];
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const mid = t => [(t[0].clientX + t[1].clientX) / 2, (t[0].clientY + t[1].clientY) / 2];
+  const one = (t, mv) => ({ pinch: false, p0: [t.clientX, t.clientY], x0: x, y0: y, s0: s, move: mv });
+  lb.addEventListener('touchstart', e => {
+    lastTouch = Date.now();
+    if (e.target.closest('button')) { g = null; return; }
+    const t = e.touches;
+    if (t.length === 2) g = { pinch: true, d0: dist(t), s0: s, m0: mid(t), x0: x, y0: y };
+    else if (t.length === 1) { g = one(t[0], false); g.onImg = e.target === big; }
+  }, { passive: true });
+  lb.addEventListener('touchmove', e => {
+    if (!g) return;
+    e.preventDefault();
+    const t = e.touches;
+    if (g.pinch && t.length === 2) {
+      const ns = Math.min(MAX, Math.max(1, g.s0 * dist(t) / g.d0)), m = mid(t), [cx, cy] = center();
+      // 兩指中點下的那一點固定不動，同時跟著中點平移
+      x = m[0] - cx - (g.m0[0] - cx - g.x0) * ns / g.s0;
+      y = m[1] - cy - (g.m0[1] - cy - g.y0) * ns / g.s0;
+      s = ns; clamp(); apply(false);
+    } else if (!g.pinch && t.length === 1) {
+      const dx = t[0].clientX - g.p0[0], dy = t[0].clientY - g.p0[1];
+      if (Math.abs(dx) + Math.abs(dy) > 8) g.move = true;
+      if (g.s0 > 1.01) { x = g.x0 + dx; y = g.y0 + dy; clamp(); apply(false); }
+      else if (dy > 0 && dy > Math.abs(dx)) { big.style.transition = 'none'; big.style.transform = `translateY(${dy}px)`; lb.style.opacity = Math.max(.4, 1 - dy / 400); }
+    }
+  }, { passive: false });
   lb.addEventListener('touchend', e => {
-    if (!t0) return; const t = e.changedTouches[0], dx = t.clientX - t0[0], dy = t.clientY - t0[1]; t0 = null;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) { show(i + (dx < 0 ? 1 : -1)); moved = true; setTimeout(() => { moved = false; }, 350); }
-    else if (dy > 80 && dy > Math.abs(dx)) { close(); }
+    lastTouch = Date.now();
+    if (!g) return;
+    if (g.pinch) {
+      if (e.touches.length === 1) g = one(e.touches[0], true);   // 放開一指 → 改成單指拖曳
+      else { if (s < 1.05) reset(true); g = null; }
+      return;
+    }
+    if (e.touches.length) return;
+    const t = e.changedTouches[0], dx = t.clientX - g.p0[0], dy = t.clientY - g.p0[1];
+    lb.style.opacity = '';
+    if (!g.move) {                                   // 點一下
+      const now = Date.now();
+      if (now - lastTap < 300 && Math.hypot(t.clientX - lastTapXY[0], t.clientY - lastTapXY[1]) < 40) {
+        lastTap = 0; toggleAt(t.clientX, t.clientY);
+      } else {
+        lastTap = now; lastTapXY = [t.clientX, t.clientY];
+        if (!g.onImg && s <= 1.01) setTimeout(() => { if (lastTap === now) close(); }, 300);   // 點背景關閉（先確認不是點兩下）
+      }
+    } else if (g.s0 <= 1.01) {                       // 沒放大時的滑動
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) show(i + (dx < 0 ? 1 : -1));
+      else if (dy > 90 && dy > Math.abs(dx)) close();
+      else reset(true);
+    }
+    g = null;
   });
   addEventListener('keydown', e => {
     if (!open) return;
     if (e.key === 'Escape') { e.preventDefault(); close(); }
     else if (e.key === 'ArrowLeft') show(i - 1);
     else if (e.key === 'ArrowRight') show(i + 1);
+    else if (e.key === '+' || e.key === '=') zoomAt(s * 1.5, innerWidth / 2, innerHeight / 2, true);
+    else if (e.key === '-') zoomAt(s / 1.5, innerWidth / 2, innerHeight / 2, true);
   });
 })();
