@@ -21,7 +21,7 @@
   let uid = ls.get('rpUid');
   if (!uid) { uid = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)); ls.set('rpUid', uid); }
   let voteOn = ls.get('rpVoteOn') === '1';  // 後端支援投票（GET 回傳 vote: true）才顯示按鈕
-  const UP_SVG = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 10.5 7H7.6v3.5H4.4V7H1.5z"/></svg>';
+  const UP_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3 4.6 13A4.6 4.6 0 0 1 11.1 6.5l.9.9.9-.9A4.6 4.6 0 0 1 19.4 13z"/></svg>';
 
   const css = `
   .rp-open{position:absolute;top:14px;right:28px;padding:0!important;border:0!important;background:none!important;font-size:14px!important;color:#526b64;text-decoration:underline;cursor:pointer}
@@ -31,7 +31,7 @@
   .rp-card{margin-top:10px;font-size:13px;color:#526b64;background:none;border:0;padding:4px 0;cursor:pointer;text-decoration:underline}
   .rp-box{margin-top:12px;font-size:14px;line-height:1.6;color:#526b64}
   .rp-box b{color:#8a4b0f}.rp-item{margin-top:6px}.rp-item+.rp-item{border-top:1px dashed #ecd3b0;padding-top:6px}
-  .rp-meta{color:#7a8a85;font-size:12px}.rp-del{margin-left:8px;padding:0;border:0;background:none;color:#b3261e;font-size:12px;cursor:pointer;text-decoration:underline}.rp-del:disabled{color:#999;cursor:wait}.rp-sug{font-weight:600;color:#152a26}
+  .rp-meta{color:#7a8a85;font-size:12px}.rp-del{margin:0;line-height:20px;padding:0;border:0;background:none;color:#b3261e;font-size:12px;cursor:pointer;text-decoration:underline}.rp-del:disabled{color:#999;cursor:wait}.rp-sug{font-weight:600;color:#152a26}
   .rp-st{display:inline-block;padding:0 6px;border-radius:4px;font-size:12px;margin-right:4px}
   .rp-st.pend{background:#fdecc8;color:#8a4b0f}.rp-st.done{background:#d7f0e0;color:#1d6b3c}.rp-st.no{background:#e6e9e8;color:#526b64}
   .rp-flash{animation:rpf 1.6s ease}@keyframes rpf{0%,40%{box-shadow:0 0 0 4px #d9822b}100%{box-shadow:none}}
@@ -51,8 +51,9 @@
   #rpDlg button[type=submit]{background:#183b35;color:#fff;border-color:#183b35}
   #rpDlg button:disabled{opacity:.5;cursor:wait}
   #rpDlg .hp{position:absolute;left:-9999px}
-  .rp-up{margin-left:8px;padding:0 7px;border:1px solid #222;border-radius:999px;background:#fff;color:#111;font:600 12px/18px system-ui;display:inline-flex;align-items:center;gap:3px;cursor:pointer;vertical-align:1px}
-  .rp-up svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linejoin:round}
+  .rp-row{display:flex;flex-wrap:wrap;align-items:center;column-gap:8px}
+  .rp-up{box-sizing:border-box;height:20px;margin:0;padding:0 7px;border:1px solid #222;border-radius:999px;background:#fff;color:#111;font:600 12px/1 system-ui;display:inline-flex;align-items:center;gap:3px;cursor:pointer}
+  .rp-up svg{display:block;width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linejoin:round}
   .rp-up.on{background:#111;color:#fff;border-color:#111}.rp-up.on svg{fill:currentColor}.rp-up:disabled{cursor:wait}`;
   document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`);
 
@@ -183,8 +184,7 @@
       const open = list.filter(r => r.status !== '已修正' && r.status !== '不是錯誤').length;
       if (open) c.querySelector('h2').insertAdjacentHTML('beforeend', `<span class="rp-chip">⚠ ${open} 則回報</span>`);
       const items = list.map(r =>
-        `<div>${esc(r.suggest || r.desc)}, by ${esc(r.name || '匿名')}(${fmt(r.t)})` +
-        (voteOn && r.id ? `<button type="button" class="rp-up${r.mine ? ' on' : ''}" data-id="${esc(r.id)}" aria-pressed="${!!r.mine}" title="${r.mine ? '收回支持' : '支持這個回報'}">${UP_SVG}<span>${r.votes || 0}</span></button>` : '') +
+        `<div class="rp-row"><span>${esc(r.suggest || r.desc)}, by ${esc(r.name || '匿名')}(${fmt(r.t)})</span>` +
         (r.id ? `<button type="button" class="rp-del" data-id="${esc(r.id)}">刪除</button>` : '') + '</div>').join('');
       const box = `<div class="rp-box">錯誤回報：${items}</div>`;
       (c.querySelector('details') || c).insertAdjacentHTML('beforeend', box);
