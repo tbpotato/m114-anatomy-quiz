@@ -184,7 +184,7 @@
       const open = list.filter(r => r.status !== '已修正' && r.status !== '不是錯誤').length;
       if (open) c.querySelector('h2').insertAdjacentHTML('beforeend', `<span class="rp-chip" title="${open} 則回報">⚠</span>`);
       const items = list.map(r =>
-        `<div class="rp-row"><span>${esc(r.name || '匿名')}覺得答案是${esc(r.suggest || r.desc)}(${fmt(r.t)})</span>` +
+        `<div class="rp-row"><span>${esc(r.name || '匿名')} 覺得答案是 <b>${esc(r.suggest || r.desc)}</b> (${fmt(r.t)})</span>` +
         (r.id ? `<button type="button" class="rp-del" data-id="${esc(r.id)}">刪除</button>` : '') + '</div>').join('');
       const box = `<div class="rp-box">錯誤回報：${items}</div>`;
       (c.querySelector('details') || c).insertAdjacentHTML('beforeend', box);
